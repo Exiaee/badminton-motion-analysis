@@ -1075,6 +1075,121 @@ plt.show()
 
 
 # =========================
+# Court Heatmap
+# =========================
+
+def draw_court_lines(ax):
+    """Draw badminton court lines on a matplotlib axes (XY plane, meters)."""
+    COURT_W  = 6.10   # x: -3.05 ~ +3.05
+    COURT_L  = 13.40  # y: -6.70 ~ +6.70
+    SINGLE_W = 5.18
+    SHORT_SV = 1.98
+    LONG_SV  = 0.76
+
+    hw = COURT_W  / 2
+    hl = COURT_L  / 2
+    sw = SINGLE_W / 2
+
+    lc = "white"
+    lw = 1.2
+
+    # outer boundary
+    rect = plt.Rectangle((-hw, -hl), COURT_W, COURT_L,
+                          edgecolor=lc, facecolor="none", linewidth=lw)
+    ax.add_patch(rect)
+
+    # net
+    ax.plot([-hw, hw], [0, 0], color="white", linewidth=2.0, linestyle="--")
+
+    # singles sidelines
+    for x in [-sw, sw]:
+        ax.plot([x, x], [-hl, hl], color=lc, linewidth=lw)
+
+    # short service lines
+    for y in [-SHORT_SV, SHORT_SV]:
+        ax.plot([-hw, hw], [y, y], color=lc, linewidth=lw)
+
+    # long service lines (doubles back boundary)
+    for y in [-(hl - LONG_SV), hl - LONG_SV]:
+        ax.plot([-hw, hw], [y, y], color=lc, linewidth=lw)
+
+    # center line (between service boxes)
+    ax.plot([0, 0], [-SHORT_SV, SHORT_SV], color=lc, linewidth=lw)
+
+    ax.set_xlim(-hw - 0.3, hw + 0.3)
+    ax.set_ylim(-hl - 0.3, hl + 0.3)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+
+
+x_pos = df["x"].dropna()
+y_pos = df["y"].dropna()
+met_vals = df.loc[x_pos.index, "MET"]
+
+# ---- 1. Density heatmap ----
+fig, ax = plt.subplots(figsize=(5, 9))
+fig.patch.set_facecolor("#1a1a2e")
+ax.set_facecolor("#1a1a2e")
+
+h, xedges, yedges, img = ax.hist2d(
+    x_pos, y_pos,
+    bins=[30, 60],
+    range=[[-3.05, 3.05], [-6.7, 6.7]],
+    cmap="hot",
+    density=True
+)
+cbar = plt.colorbar(img, ax=ax)
+cbar.set_label("Density", color="white")
+cbar.ax.yaxis.set_tick_params(color="white")
+plt.setp(cbar.ax.yaxis.get_ticklabels(), color="white")
+
+draw_court_lines(ax)
+ax.set_title("Court Coverage Heatmap (Density)", color="white")
+ax.tick_params(colors="white")
+for spine in ax.spines.values():
+    spine.set_edgecolor("white")
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT_FOLDER}/heatmap_density_{safe_folder_name}_{date}.png",
+            dpi=300, facecolor=fig.get_facecolor())
+plt.show()
+print(f"[Heatmap] Saved density heatmap")
+
+# ---- 2. MET heatmap (average MET per grid cell) ----
+fig, ax = plt.subplots(figsize=(5, 9))
+fig.patch.set_facecolor("#1a1a2e")
+ax.set_facecolor("#1a1a2e")
+
+x_bins = np.linspace(-3.05,  3.05, 31)
+y_bins = np.linspace(-6.70,  6.70, 61)
+
+met_sum, _, _ = np.histogram2d(x_pos, y_pos, bins=[x_bins, y_bins],
+                                weights=met_vals)
+count,   _, _ = np.histogram2d(x_pos, y_pos, bins=[x_bins, y_bins])
+
+with np.errstate(invalid="ignore"):
+    met_avg = np.where(count > 0, met_sum / count, np.nan)
+
+im = ax.pcolormesh(x_bins, y_bins, met_avg.T, cmap="RdYlGn_r", shading="auto")
+cbar = plt.colorbar(im, ax=ax)
+cbar.set_label("Avg MET", color="white")
+cbar.ax.yaxis.set_tick_params(color="white")
+plt.setp(cbar.ax.yaxis.get_ticklabels(), color="white")
+
+draw_court_lines(ax)
+ax.set_title("Court MET Heatmap (Avg MET per Zone)", color="white")
+ax.tick_params(colors="white")
+for spine in ax.spines.values():
+    spine.set_edgecolor("white")
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT_FOLDER}/heatmap_met_{safe_folder_name}_{date}.png",
+            dpi=300, facecolor=fig.get_facecolor())
+plt.show()
+print(f"[Heatmap] Saved MET heatmap")
+
+# =========================
 # Summary Report
 # =========================
 

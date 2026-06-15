@@ -870,6 +870,59 @@ df["MAD_hip_combined"] = (
     )
 )
 
+# =========================================================
+# WRIST-based PL / MAD  (Chiang et al., 2020: best placement for badminton)
+# Uses keypoints 9 (Left_Wrist) and 10 (Right_Wrist)
+# Active wrist = whichever hand has larger acceleration magnitude
+# =========================================================
+
+if "x_rwrist" in df.columns and "x_lwrist" in df.columns:
+
+    for side, xs, ys, zs, vxs, vys, vzs in [
+        ("r", "x_rwrist", "y_rwrist", "z_rwrist", "vx_rwrist", "vy_rwrist", "vz_rwrist"),
+        ("l", "x_lwrist", "y_lwrist", "z_lwrist", "vx_lwrist", "vy_lwrist", "vz_lwrist"),
+    ]:
+        vx_diff = np.gradient(df[xs], dt)
+        vy_diff = np.gradient(df[ys], dt)
+        vz_diff = np.gradient(df[zs], dt)
+
+        vx_comb = KF_WEIGHT * df[vxs] + RAW_WEIGHT * vx_diff
+        vy_comb = KF_WEIGHT * df[vys] + RAW_WEIGHT * vy_diff
+        vz_comb = KF_WEIGHT * df[vzs] + RAW_WEIGHT * vz_diff
+
+        ax = np.gradient(vx_comb, dt, edge_order=2)
+        ay = np.gradient(vy_comb, dt, edge_order=2)
+        az = np.gradient(vz_comb, dt, edge_order=2)
+
+        for c, arr in [(f"ax_{side}wrist", ax), (f"ay_{side}wrist", ay), (f"az_{side}wrist", az)]:
+            df[c] = savgol_filter(arr, window_length=21, polyorder=2)
+
+        dax = df[f"ax_{side}wrist"].diff().fillna(0)
+        day = df[f"ay_{side}wrist"].diff().fillna(0)
+        daz = df[f"az_{side}wrist"].diff().fillna(0)
+
+        pl = np.sqrt(dax**2 + day**2 + daz**2) / 100
+        pl = pl.clip(lower=0, upper=pl.quantile(0.95))
+        df[f"PL_{side}wrist"] = savgol_filter(pl, window_length=21, polyorder=2)
+
+        acc_mag = np.sqrt(df[f"ax_{side}wrist"]**2 + df[f"ay_{side}wrist"]**2 + df[f"az_{side}wrist"]**2)
+        df[f"MAD_{side}wrist"] = (
+            acc_mag
+            .rolling(window, center=True, min_periods=1)
+            .apply(lambda x: np.mean(np.abs(x - np.mean(x))), raw=True)
+        )
+
+    # active wrist = max of right and left (dominant hand)
+    df["PL_wrist"]  = np.maximum(df["PL_rwrist"],  df["PL_lwrist"])
+    df["MAD_wrist"] = np.maximum(df["MAD_rwrist"], df["MAD_lwrist"])
+
+    print(f"[Wrist PL]  peak={df['PL_wrist'].max():.4f}  mean={df['PL_wrist'].mean():.4f}")
+    print(f"[Wrist MAD] peak={df['MAD_wrist'].max():.4f} mean={df['MAD_wrist'].mean():.4f}")
+else:
+    df["PL_wrist"]  = np.nan
+    df["MAD_wrist"] = np.nan
+    print("[Wrist PL/MAD] wrist columns not found in CSV — re-run top_down_jsonl.py to generate them")
+
 # =========================
 # Plots
 # =========================
@@ -1022,6 +1075,32 @@ plt.savefig(
     dpi=300
 )
 plt.show()
+
+# ---- Wrist PL vs Ankle PL vs Hip PL ----
+if df["PL_wrist"].notna().any():
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+
+    axes[0].plot(df["time_sec"], df["PL"],       label="Ankle PL",  linewidth=1)
+    axes[0].plot(df["time_sec"], df["PL_hip"],   label="Hip PL",    linewidth=1)
+    axes[0].plot(df["time_sec"], df["PL_wrist"], label="Wrist PL",  linewidth=1, color="red")
+    axes[0].set_ylabel("PL (AU)")
+    axes[0].set_title("Player Load: Ankle vs Hip vs Wrist  (Wrist = best for badminton, Chiang et al. 2020)")
+    axes[0].legend()
+    axes[0].grid(True)
+
+    axes[1].plot(df["time_sec"], df["MAD"],          label="Ankle MAD", linewidth=1)
+    axes[1].plot(df["time_sec"], df["MAD_hip"],      label="Hip MAD",   linewidth=1)
+    axes[1].plot(df["time_sec"], df["MAD_wrist"],    label="Wrist MAD", linewidth=1, color="red")
+    axes[1].set_xlabel("Time (sec)")
+    axes[1].set_ylabel("MAD (AU)")
+    axes[1].set_title("MAD: Ankle vs Hip vs Wrist")
+    axes[1].legend()
+    axes[1].grid(True)
+
+    plt.tight_layout()
+    plt.savefig(f"{OUTPUT_FOLDER}/pl_mad_ankle_hip_wrist_{safe_folder_name}_{date}.png", dpi=300)
+    plt.show()
+    print("[Wrist] Saved PL/MAD comparison plot")
 
 plt.figure(figsize=(12,4))
 '''plt.plot(

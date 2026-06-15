@@ -1578,6 +1578,9 @@ def main():
                 axis=0
             )
 
+            right_wrist_v = velocities[BodyKpt.Right_Wrist]
+            left_wrist_v  = velocities[BodyKpt.Left_Wrist]
+
             left_ankle = filtered_points[BodyKpt.Left_Ankle]
             right_ankle = filtered_points[BodyKpt.Right_Ankle]
             #left_ankle = smoothed_points[BodyKpt.Left_Ankle]
@@ -1646,7 +1649,19 @@ def main():
                 "z_hip": player_pos_hip[2],
                 "vx_hip": player_v_hip[0],
                 "vy_hip": player_v_hip[1],
-                "vz_hip": player_v_hip[2]
+                "vz_hip": player_v_hip[2],
+                "x_rwrist": right_wrist[0],
+                "y_rwrist": right_wrist[1],
+                "z_rwrist": right_wrist[2],
+                "vx_rwrist": right_wrist_v[0],
+                "vy_rwrist": right_wrist_v[1],
+                "vz_rwrist": right_wrist_v[2],
+                "x_lwrist": left_wrist[0],
+                "y_lwrist": left_wrist[1],
+                "z_lwrist": left_wrist[2],
+                "vx_lwrist": left_wrist_v[0],
+                "vy_lwrist": left_wrist_v[1],
+                "vz_lwrist": left_wrist_v[2],
             }
 
             if i == 0:
